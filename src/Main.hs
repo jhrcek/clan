@@ -1,5 +1,5 @@
 import Control.Exception (ErrorCall, evaluate, catch)
-import Data.Either (either)
+import Data.Either (partitionEithers)
 import Language.Java.Parser (parser, compilationUnit)
 import Language.Java.Syntax (CompilationUnit)
 import qualified Data.Text as T
@@ -16,17 +16,24 @@ main :: IO ()
 main = do
     classListFile <- getCmdLineArgs
     classes <- lines <$> readFile classListFile
-    extendsPairs <- mapM processFile classes
-    let extendsData = concat extendsPairs
+    (_parseErrors, parsedASTs) <- partitionEithers `fmap` mapM parseJavaFile classes
+
+    -- extends pairs
+    let extendsPairs = concatMap getExtendsPairs parsedASTs
     putStrLn processingFinished
-    writeFile "hierarchy.dot" $ toDot extendsData
+    writeFile "hierarchy.dot" $ toDot extendsPairs
+
+    -- FQNs of the classes
+    let fqns = concatMap getTopLevelClasses parsedASTs
+    mapM_ print fqns
+
 
 toDot :: [(String, String)] -> String
 toDot exPairs =
   let
     edgeLines = unlines $ map pairToEdge exPairs
     pairToEdge (cls, superCls) = printf "\"%s\"->\"%s\"" cls superCls
-  in  "digraph G {\noverlap=false\nrankdir=BT\n" ++ edgeLines ++ "}"
+  in  "digraph G {\ngraph[overlap=false,rankdir=BT];\n" ++ edgeLines ++ "}"
 
 getCmdLineArgs :: IO FilePath
 getCmdLineArgs = do
@@ -35,17 +42,14 @@ getCmdLineArgs = do
       then return $ head as
       else die cmdLineMissingArgs
 
-processFile :: FilePath -> IO [(String, String)]
-processFile javaSourceFile = do
+parseJavaFile :: FilePath -> IO (Either ParseError CompilationUnit)
+parseJavaFile javaSourceFile = do
     putStrLn $ "Processing " ++ takeFileName javaSourceFile
     sourceStr <- T.unpack <$> TO.readFile javaSourceFile
     parseResult <- evaluate (parser compilationUnit sourceStr) `catch` alexLexicalErrorHandler --evaluate to force potential error
-    either printError processAST parseResult
+    either (\e -> putStrLn $ "Error processing "++ javaSourceFile ++ show e) (const $ return ()) parseResult
+    return parseResult
   where
-    printError parseErr = return [] --putStrLn $ "ERROR processing " ++ javaSourceFile ++ "\n" ++ (unwords . take 3 .lines . show) parseErr
-
-    processAST = return . getExtendsPairs
-
     alexLexicalErrorHandler :: ErrorCall -> IO (Either ParseError CompilationUnit)
     alexLexicalErrorHandler ex = -- wrap lexical error as parse error
       let parseError = newErrorMessage (Message . head . lines $ show ex) (newPos "" 1 1)
