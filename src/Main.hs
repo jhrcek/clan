@@ -21,9 +21,7 @@ main = do
     (_parseErrors, parsedASTs) <- partitionEithers `fmap` mapM parseJavaFile classes
     --inheritanceHierarchyToDotFile parsedASTs "hierarchy.dot"
     --printTopLevelClasses parsedASTs
-    writeFile "tree.json" $ show $ getInheritanceHierarchyAsJson parsedASTs
-
-
+    inheritanceHierarchyToJsonFile parsedASTs "hierarchy.json"
 
 
 getCmdLineArgs :: IO FilePath

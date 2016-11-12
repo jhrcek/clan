@@ -1,11 +1,15 @@
-module Analyze.AstProc where
-  -- ( printTopLevelClasses
-  -- , inheritanceHierarchyToDotFile
-  -- , inheritanceHierarchyToTree
-  -- ) where
+{-# LANGUAGE OverloadedStrings #-}
 
-import Data.List (intercalate)
-import Data.Tree (Forest, Tree(Node))
+module Analyze.AstProc 
+  ( printTopLevelClasses
+  , inheritanceHierarchyToDotFile
+  , inheritanceHierarchyToJsonFile
+  ) where
+
+import Data.Aeson (encode, toJSON)
+import Data.Aeson.Types () -- ToJSON instance of Data.Tree
+import qualified Data.ByteString.Lazy as BS
+import Data.Tree (Tree(Node))
 import Data.Tuple (swap)
 import Language.Java.Syntax (CompilationUnit)
 import Text.Printf (printf)
@@ -39,17 +43,11 @@ toDot exPairs = "digraph G {\ngraph[overlap=false,rankdir=BT];\n" ++ edgeLines +
     edgeLines = unlines $ map pairToEdge exPairs
     pairToEdge (cls, superCls) = printf "\"%s\"->\"%s\"" cls superCls
 
-
-inheritanceHierarchyToTree :: [CompilationUnit] -> Forest String
+inheritanceHierarchyToTree :: [CompilationUnit] -> Tree String
 inheritanceHierarchyToTree parsedASTs =
     let extendsPairs = map swap $ concatMap getExtendsPairs parsedASTs
-    in buildForest extendsPairs
+    in Node "<root>" $ buildForest extendsPairs
 
-treeToJson :: Tree String -> String
-treeToJson (Node r cs) = "{\"n\":\"" ++ r  ++"\",\"c\":" ++ forestToJson cs ++ "}"
-
-forestToJson :: Forest String -> String
-forestToJson trees = "[" ++ intercalate "," (map treeToJson trees) ++"]"
-
-getInheritanceHierarchyAsJson :: [CompilationUnit] -> String
-getInheritanceHierarchyAsJson = treeToJson . head . inheritanceHierarchyToTree
+inheritanceHierarchyToJsonFile :: [CompilationUnit] -> FilePath -> IO ()
+inheritanceHierarchyToJsonFile parsedASTs f =
+    BS.writeFile f . encode . toJSON $ inheritanceHierarchyToTree parsedASTs
