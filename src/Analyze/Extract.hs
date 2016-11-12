@@ -1,4 +1,4 @@
-module Analyze.Analyze
+module Analyze.Extract
   ( getTopLevelClasses
   , getExtendsPairs
   , Class_ (C)

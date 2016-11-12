@@ -1,3 +1,5 @@
+module Main where
+
 import Control.Exception (ErrorCall, evaluate, catch)
 import Data.Either (partitionEithers)
 import Language.Java.Parser (parser, compilationUnit)
@@ -9,31 +11,20 @@ import System.FilePath (takeFileName)
 import System.Exit (die)
 import Text.Parsec.Error (newErrorMessage, Message(Message), ParseError)
 import Text.Parsec.Pos (newPos)
-import Text.Printf (printf)
-import Analyze.Analyze
+
+import Analyze.AstProc
 
 main :: IO ()
 main = do
     classListFile <- getCmdLineArgs
     classes <- lines <$> readFile classListFile
     (_parseErrors, parsedASTs) <- partitionEithers `fmap` mapM parseJavaFile classes
-
-    -- extends pairs
-    let extendsPairs = concatMap getExtendsPairs parsedASTs
-    putStrLn processingFinished
-    writeFile "hierarchy.dot" $ toDot extendsPairs
-
-    -- FQNs of the classes
-    let fqns = concatMap getTopLevelClasses parsedASTs
-    mapM_ print fqns
+    --inheritanceHierarchyToDotFile parsedASTs "hierarchy.dot"
+    --printTopLevelClasses parsedASTs
+    writeFile "tree.json" $ show $ getInheritanceHierarchyAsJson parsedASTs
 
 
-toDot :: [(String, String)] -> String
-toDot exPairs =
-  let
-    edgeLines = unlines $ map pairToEdge exPairs
-    pairToEdge (cls, superCls) = printf "\"%s\"->\"%s\"" cls superCls
-  in  "digraph G {\ngraph[overlap=false,rankdir=BT];\n" ++ edgeLines ++ "}"
+
 
 getCmdLineArgs :: IO FilePath
 getCmdLineArgs = do
@@ -55,12 +46,5 @@ parseJavaFile javaSourceFile = do
       let parseError = newErrorMessage (Message . head . lines $ show ex) (newPos "" 1 1)
       in return $ Left parseError
 
-processingFinished, cmdLineMissingArgs :: String
-processingFinished = unlines
-  [ "----- SOURCE PROCESSING FINISHED -----"
-  , "Data written to file graph.dot"
-  , "To render it you'll need graphviz package installed"
-  , "You can render it using: tred hierarchy.dot | dot  -Tsvg -o hierarchy.svg"
-  ]
-
+cmdLineMissingArgs :: String
 cmdLineMissingArgs = "ERROR: Please provide path to file containing list of classes to analyze as command line argument"

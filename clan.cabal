@@ -16,9 +16,12 @@ cabal-version:       >=1.10
 executable clan
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       Analyze.Analyze  
+  other-modules:       Analyze.AstProc
+                     , Analyze.Extract
+                     , Analyze.TreeBuilder
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:       base
+                     , containers
                      , filepath
                      , language-java
                      , parsec
